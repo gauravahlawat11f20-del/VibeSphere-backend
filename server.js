@@ -23,6 +23,7 @@ const allowedOrigins = (process.env.CLIENT_URL || "")
   .filter(Boolean);
 
 const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === "true";
+const allowAllOrigins = process.env.ALLOW_ALL_ORIGINS === "true";
 const vercelPreviewPrefix =
   process.env.VERCEL_PREVIEW_PREFIX || "vibe-sphere-frontend-";
 const vercelPreviewRegex = new RegExp(
@@ -37,9 +38,12 @@ const corsOptions = {
       "| Allowed:",
       allowedOrigins,
       "| Allow previews:",
-      allowVercelPreviews
+      allowVercelPreviews,
+      "| Allow all:",
+      allowAllOrigins
     );
     if (!origin) return callback(null, true);
+    if (allowAllOrigins) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     if (allowVercelPreviews && vercelPreviewRegex.test(origin))
       return callback(null, true);

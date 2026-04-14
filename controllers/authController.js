@@ -2,6 +2,16 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const getCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
+    path: "/api/auth/refresh",
+  };
+};
+
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "15m" });
   const refreshToken = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
@@ -25,6 +35,7 @@ exports.register = async (req, res, next) => {
     await user.save();
 
     const { password: _, refreshToken: __, ...userData } = user.toObject();
+    res.cookie("refreshToken", refreshToken, getCookieOptions());
     res.status(201).json({ user: userData, accessToken, refreshToken });
   } catch (err) { next(err); }
 };
@@ -43,13 +54,14 @@ exports.login = async (req, res, next) => {
     await user.save();
 
     const { password: _, refreshToken: __, ...userData } = user.toObject();
+    res.cookie("refreshToken", refreshToken, getCookieOptions());
     res.json({ user: userData, accessToken, refreshToken });
   } catch (err) { next(err); }
 };
 
 exports.refresh = async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
     if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
@@ -60,6 +72,7 @@ exports.refresh = async (req, res, next) => {
     const tokens = generateTokens(user._id);
     user.refreshToken = tokens.refreshToken;
     await user.save();
+    res.cookie("refreshToken", tokens.refreshToken, getCookieOptions());
     res.json(tokens);
   } catch (err) { next(err); }
 };
@@ -67,6 +80,7 @@ exports.refresh = async (req, res, next) => {
 exports.logout = async (req, res, next) => {
   try {
     await User.findByIdAndUpdate(req.userId, { refreshToken: "" });
+    res.clearCookie("refreshToken", getCookieOptions());
     res.json({ message: "Logged out" });
   } catch (err) { next(err); }
 };

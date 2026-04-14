@@ -3,9 +3,37 @@ const { Server } = require("socket.io");
 let io;
 const onlineUsers = {};
 
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === "true";
+const allowAllOrigins = process.env.ALLOW_ALL_ORIGINS === "true";
+const vercelPreviewPrefix =
+  process.env.VERCEL_PREVIEW_PREFIX || "vibe-sphere-frontend-";
+const vercelPreviewRegex = new RegExp(
+  `^https:\\/\\/${vercelPreviewPrefix}.*\\.vercel\\.app$`
+);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (allowAllOrigins) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (allowVercelPreviews && vercelPreviewRegex.test(origin)) return true;
+  return false;
+};
+
 const initSocket = (server) => {
   io = new Server(server, {
-    cors: { origin: process.env.CLIENT_URL, methods: ["GET", "POST"] },
+    cors: {
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
+      },
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
   });
 
   io.on("connection", (socket) => {

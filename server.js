@@ -22,10 +22,19 @@ const allowedOrigins = (process.env.CLIENT_URL || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const allowVercelPreviews = process.env.ALLOW_VERCEL_PREVIEWS === "true";
+const vercelPreviewPrefix =
+  process.env.VERCEL_PREVIEW_PREFIX || "vibe-sphere-frontend-";
+const vercelPreviewRegex = new RegExp(
+  `^https:\\/\\/${vercelPreviewPrefix}.*\\.vercel\\.app$`
+);
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowVercelPreviews && vercelPreviewRegex.test(origin))
+      return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
